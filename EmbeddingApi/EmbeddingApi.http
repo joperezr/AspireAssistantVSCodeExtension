@@ -1,0 +1,6 @@
+@EmbeddingApi_HostAddress = http://localhost:5101
+
+GET {{EmbeddingApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
