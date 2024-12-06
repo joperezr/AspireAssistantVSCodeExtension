@@ -4,6 +4,9 @@ using Microsoft.Extensions.Logging;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// Set to true if you want to use Ollama for embedding generation instead of OpenAI
+const bool usingOllama = true;
+
 // Register HttpClient in the DI container
 builder.Services.AddHttpClient();
 
@@ -13,9 +16,15 @@ var vectorDB = builder.AddQdrant("vectordb", apiKey: key, grpcPort: 6334, httpPo
     .WithDataBindMount("./qdrant_data")
     .WithLifetime(ContainerLifetime.Persistent);
 
+var ollama = usingOllama ? builder
+    .AddOllama("ollama")
+    .WithLifetime(ContainerLifetime.Persistent)
+    .AddModel("all-minilm") 
+    : null;
+
 var rb = builder.AddProject<Projects.EmbeddingApi>("embeddingapi")
-    .WaitFor(vectorDB)
-    .WithReference(vectorDB);
+.WaitFor(vectorDB)
+.WithReference(vectorDB);
 
 rb.WithCommand(
         name: "initialize-db",
@@ -25,8 +34,17 @@ rb.WithCommand(
         iconName: "AnimalRabbitOff",
         iconVariant: IconVariant.Filled);
 
+if (usingOllama)
+{
+    rb
+     .WaitFor(ollama)
+     .WithReference(ollama)
+     .WithEnvironment(e => e.EnvironmentVariables.Add("USING_OLLAMA", "true"));
+}
+
 
 builder.Build().Run();
+
 ResourceCommandState OnUpdateResourceState(UpdateCommandStateContext context)
 {
     var logger = context.ServiceProvider.GetRequiredService<ILogger<Program>>();

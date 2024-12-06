@@ -16,12 +16,22 @@ builder.Configuration.AddUserSecrets<Program>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.AddQdrantClient("vectordb");
-builder.Services.AddSingleton(new OpenAIClient(builder.Configuration.GetValue<string>("OpenAI_KEY")));
 
-builder.Services.AddEmbeddingGenerator<string, Embedding<float>>(services =>
-    services.GetRequiredService<OpenAIClient>().AsEmbeddingGenerator(modelId: "text-embedding-3-small"))
-        .UseLogging()
-        .UseOpenTelemetry();
+bool usingOllama = Environment.GetEnvironmentVariable("USING_OLLAMA") == "true";
+
+if (usingOllama)
+{
+    builder.AddOllamaSharpEmbeddingGenerator("ollama-all-minilm");
+}
+else
+{ 
+    builder.Services.AddSingleton(new OpenAIClient(builder.Configuration.GetValue<string>("OpenAI_KEY")));
+
+    builder.Services.AddEmbeddingGenerator<string, Embedding<float>>(services =>
+        services.GetRequiredService<OpenAIClient>().AsEmbeddingGenerator(modelId: "text-embedding-3-small"))
+            .UseLogging()
+            .UseOpenTelemetry();
+}
 
 // Register HttpClient
 builder.Services.AddHttpClient();
@@ -120,7 +130,8 @@ class Paragraph
     [VectorStoreRecordData]
     public string? Content { get; set; }
 
-    [VectorStoreRecordVector(1536, DistanceFunction.CosineSimilarity)]
+ //   [VectorStoreRecordVector(1536, DistanceFunction.CosineSimilarity)]  If using OpenAI uncomment this line and comment next one.
+    [VectorStoreRecordVector(384, DistanceFunction.CosineSimilarity)]
     public ReadOnlyMemory<float> Vector { get; set; }
 }
 
